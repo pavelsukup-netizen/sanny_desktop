@@ -14,5 +14,7 @@ contextBridge.exposeInMainWorld('sanny', {
   openAssets: () => ipcRenderer.invoke('open-assets'),
   saveVoiceSample: data => ipcRenderer.invoke('save-voice-sample', data),
   listVoiceSamples: () => ipcRenderer.invoke('list-voice-samples'),
+  createVoiceProfile: data => ipcRenderer.invoke('create-voice-profile', data),
+  startVoiceEngine: () => ipcRenderer.invoke('start-voice-engine'),
   operator: action => ipcRenderer.invoke('operator', action)
 });
