@@ -1,12 +1,12 @@
 name: Build Sanny Desktop
 
 on:
-  push:
-    branches: ["feature/sanny-desktop-0.4", "main"]
+  pull_request:
+    branches: ["main"]
   workflow_dispatch:
 
 concurrency:
-  group: sanny-source-${{ github.ref }}
+  group: sanny-source-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
