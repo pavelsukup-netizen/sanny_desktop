@@ -1,13 +1,20 @@
 import json
 import os
 import tempfile
+import threading
 from pathlib import Path
 from typing import Optional
+
+ENGINE_DIR = Path(__file__).resolve().parent
+LICENSE_MARKER = ENGINE_DIR / ".tos_accepted"
+LICENSE_ACCEPTED = LICENSE_MARKER.exists()
+if LICENSE_ACCEPTED:
+    os.environ.setdefault("COQUI_TOS_AGREED", "1")
 
 import torch
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from TTS.api import TTS
 
 HOST = "127.0.0.1"
@@ -18,8 +25,9 @@ PROFILES = ROOT / "voice-lab" / "profiles"
 SAMPLES.mkdir(parents=True, exist_ok=True)
 PROFILES.mkdir(parents=True, exist_ok=True)
 
-app = FastAPI(title="Sanny Voice Engine", version="0.4.0")
+app = FastAPI(title="Sanny Voice Engine", version="0.4.1")
 model: Optional[TTS] = None
+model_lock = threading.Lock()
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 
@@ -31,35 +39,48 @@ class SynthesisRequest(BaseModel):
 
 class ProfileRequest(BaseModel):
     name: str = "sanny"
-    samples: list[str] = []
+    samples: list[str] = Field(default_factory=list)
 
 
 def get_model() -> TTS:
     global model
-    if model is None:
-        model = TTS("tts_models/multilingual/multi-dataset/xtts_v2").to(device)
+    if not LICENSE_ACCEPTED:
+        raise HTTPException(
+            428,
+            "Nejdřív spusť voice-engine\\install-engine.bat a potvrď licenci XTTS-v2.",
+        )
+    with model_lock:
+        if model is None:
+            model = TTS("tts_models/multilingual/multi-dataset/xtts_v2").to(device)
     return model
 
 
+def safe_profile_name(name: str) -> str:
+    return "".join(c for c in name if c.isalnum() or c in "_-. ").strip() or "sanny"
+
+
 def profile_file(name: str) -> Path:
-    safe = "".join(c for c in name if c.isalnum() or c in "_-.") or "sanny"
-    return PROFILES / safe / "profile.json"
+    return PROFILES / safe_profile_name(name) / "profile.json"
 
 
 def profile_samples(name: str) -> list[str]:
     p = profile_file(name)
     if p.exists():
-        data = json.loads(p.read_text(encoding="utf-8"))
-        files = [str(Path(x)) for x in data.get("samples", []) if Path(x).exists()]
-        if files:
-            return files
+        try:
+            data = json.loads(p.read_text(encoding="utf-8"))
+            files = [str(Path(x)) for x in data.get("samples", []) if Path(x).exists()]
+            if files:
+                return files
+        except (OSError, json.JSONDecodeError):
+            pass
     return [str(x) for x in sorted(SAMPLES.glob("*.wav"))[:10]]
 
 
 @app.get("/health")
 def health():
     return {
-        "ok": True,
+        "ok": LICENSE_ACCEPTED,
+        "license_accepted": LICENSE_ACCEPTED,
         "model_loaded": model is not None,
         "device": device,
         "cuda_available": torch.cuda.is_available(),
@@ -71,7 +92,10 @@ def health():
 def profiles():
     result = []
     for p in PROFILES.glob("*/profile.json"):
-        result.append(json.loads(p.read_text(encoding="utf-8")))
+        try:
+            result.append(json.loads(p.read_text(encoding="utf-8")))
+        except (OSError, json.JSONDecodeError):
+            continue
     return {"profiles": result}
 
 
@@ -81,15 +105,16 @@ def create_profile(req: ProfileRequest):
     for item in req.samples:
         candidate = SAMPLES / Path(item).name
         if candidate.exists() and candidate.suffix.lower() == ".wav":
-            chosen.append(str(candidate))
+            chosen.append(str(candidate.resolve()))
     if not chosen:
-        chosen = [str(x) for x in sorted(SAMPLES.glob("*.wav"))[:10]]
+        chosen = [str(x.resolve()) for x in sorted(SAMPLES.glob("*.wav"))[:10]]
     if not chosen:
         raise HTTPException(400, "Nejsou dostupné žádné WAV vzorky.")
 
-    p = profile_file(req.name)
+    name = safe_profile_name(req.name)
+    p = profile_file(name)
     p.parent.mkdir(parents=True, exist_ok=True)
-    data = {"name": req.name, "language": "cs", "samples": chosen}
+    data = {"name": name, "language": "cs", "samples": chosen}
     p.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     return data
 
