@@ -78,9 +78,11 @@ def profile_samples(name: str) -> list[str]:
 
 @app.get("/health")
 def health():
+    if not LICENSE_ACCEPTED:
+        raise HTTPException(428, "Licence XTTS-v2 zatím nebyla potvrzena.")
     return {
-        "ok": LICENSE_ACCEPTED,
-        "license_accepted": LICENSE_ACCEPTED,
+        "ok": True,
+        "license_accepted": True,
         "model_loaded": model is not None,
         "device": device,
         "cuda_available": torch.cuda.is_available(),
