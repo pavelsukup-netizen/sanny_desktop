@@ -1,12 +1,12 @@
-import io
 import json
 import os
+import tempfile
 from pathlib import Path
 from typing import Optional
 
 import torch
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response
 from pydantic import BaseModel
 from TTS.api import TTS
 
@@ -22,10 +22,12 @@ app = FastAPI(title="Sanny Voice Engine", version="0.4.0")
 model: Optional[TTS] = None
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
+
 class SynthesisRequest(BaseModel):
     text: str
     language: str = "cs"
     profile: str = "sanny"
+
 
 class ProfileRequest(BaseModel):
     name: str = "sanny"
@@ -53,6 +55,7 @@ def profile_samples(name: str) -> list[str]:
             return files
     return [str(x) for x in sorted(SAMPLES.glob("*.wav"))[:10]]
 
+
 @app.get("/health")
 def health():
     return {
@@ -60,16 +63,17 @@ def health():
         "model_loaded": model is not None,
         "device": device,
         "cuda_available": torch.cuda.is_available(),
-        "sample_count": len(list(SAMPLES.glob("*.wav")))
+        "sample_count": len(list(SAMPLES.glob("*.wav"))),
     }
+
 
 @app.get("/profiles")
 def profiles():
     result = []
     for p in PROFILES.glob("*/profile.json"):
-        data = json.loads(p.read_text(encoding="utf-8"))
-        result.append(data)
+        result.append(json.loads(p.read_text(encoding="utf-8")))
     return {"profiles": result}
+
 
 @app.post("/profiles/create")
 def create_profile(req: ProfileRequest):
@@ -82,26 +86,46 @@ def create_profile(req: ProfileRequest):
         chosen = [str(x) for x in sorted(SAMPLES.glob("*.wav"))[:10]]
     if not chosen:
         raise HTTPException(400, "Nejsou dostupné žádné WAV vzorky.")
+
     p = profile_file(req.name)
     p.parent.mkdir(parents=True, exist_ok=True)
     data = {"name": req.name, "language": "cs", "samples": chosen}
     p.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     return data
 
+
 @app.post("/synthesize")
 def synthesize(req: SynthesisRequest):
     text = req.text.strip()
     if not text:
         raise HTTPException(400, "Text je prázdný.")
+
     refs = profile_samples(req.profile)
     if not refs:
         raise HTTPException(400, "Hlasový profil nemá žádné WAV reference.")
+
     tts = get_model()
-    buffer = io.BytesIO()
-    tts.tts_to_file(text=text[:5000], speaker_wav=refs, language=req.language, file_path=buffer)
-    buffer.seek(0)
-    return StreamingResponse(buffer, media_type="audio/wav")
+    temp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+            temp_path = tmp.name
+        tts.tts_to_file(
+            text=text[:5000],
+            speaker_wav=refs,
+            language=req.language,
+            file_path=temp_path,
+        )
+        audio = Path(temp_path).read_bytes()
+        return Response(content=audio, media_type="audio/wav")
+    finally:
+        if temp_path:
+            try:
+                Path(temp_path).unlink(missing_ok=True)
+            except OSError:
+                pass
+
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host=HOST, port=PORT)
