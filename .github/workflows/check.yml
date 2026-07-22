@@ -1,0 +1,44 @@
+name: Build Sanny Desktop
+
+on:
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+concurrency:
+  group: sanny-source-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-source:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Check JavaScript syntax
+        run: npm run check
+
+      - name: Check Python syntax
+        run: python -m py_compile voice-engine/server.py
+
+      - name: Upload downloadable source ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sanny_Desktop_0_4_Fixed_Source
+          retention-days: 7
+          if-no-files-found: error
+          path: |
+            bootstrap.js
+            main.js
+            preload.js
+            renderer.html
+            package.json
+            README.md
+            INSTALL_AND_RUN.bat
+            scripts/**
+            voice-engine/**
+            assets/**
