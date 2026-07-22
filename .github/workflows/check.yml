@@ -3,21 +3,21 @@ name: Build Sanny Desktop
 on:
   push:
     branches: ["feature/sanny-desktop-0.4", "main"]
-  pull_request:
   workflow_dispatch:
+
+concurrency:
+  group: sanny-source-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build-source:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-
-      - name: Install Electron dependencies
-        run: npm install
 
       - name: Check JavaScript syntax
         run: npm run check
