@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Sanny Desktop</title>
+  <style>
+    :root{color-scheme:dark;--bg:#0a0d11;--card:#11161d;--line:#26313d;--text:#eef3f8;--muted:#94a2b2;--accent:#21c875;--danger:#ff6577}
+    *{box-sizing:border-box}html,body{margin:0;background:transparent;color:var(--text);font-family:Inter,Segoe UI,Arial,sans-serif}button,input,select,textarea{font:inherit}
+    .avatar-shell{width:100%;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;padding:8px;user-select:none}
+    .avatar-stage{position:relative;width:100%;flex:1;border-radius:24px;overflow:hidden;background:radial-gradient(circle at 50% 35%,#273342,#0a0d11 68%);border:1px solid rgba(255,255,255,.08)}
+    .avatar-placeholder{position:absolute;inset:0;display:grid;place-items:center;font-size:82px;filter:drop-shadow(0 10px 25px #000)}
+    .avatar-bar{display:flex;gap:8px;padding:8px;margin-top:8px;background:rgba(10,13,17,.9);border:1px solid var(--line);border-radius:18px}
+    .icon{width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:#151b22;color:var(--text);cursor:pointer}.drag{-webkit-app-region:drag;cursor:move}.no-drag{-webkit-app-region:no-drag}
+    .console{min-height:100vh;background:var(--bg);border:1px solid var(--line);display:flex;flex-direction:column;overflow:hidden}
+    .titlebar{height:48px;display:flex;align-items:center;gap:10px;padding:0 10px;border-bottom:1px solid var(--line);background:#0d1117;-webkit-app-region:drag}.titlebar button,.titlebar select{-webkit-app-region:no-drag}
+    .brand{font-weight:700}.statusline{font-size:12px;color:var(--muted)}.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--danger);margin-right:5px}.dot.ok{background:var(--accent)}
+    .spacer{flex:1}.toolbar{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;padding:10px;border-bottom:1px solid var(--line)}select,input,textarea{background:#11161d;color:var(--text);border:1px solid var(--line);border-radius:12px;padding:9px 11px}button{border:1px solid var(--line);border-radius:12px;background:#151b22;color:var(--text);padding:9px 12px;cursor:pointer}button.primary{background:#173c2a;border-color:#237e50}button.danger{background:#3c171d;border-color:#7e2936}
+    .heartbeat-wrap{padding:0 10px 10px;border-bottom:1px solid var(--line)}.heartbeat{width:100%;height:auto;display:block;border-radius:14px;border:1px solid var(--line);background:#080b0f}.heartbeat.offline{filter:grayscale(1);opacity:.62}.missing{padding:18px;text-align:center;border:1px dashed var(--line);border-radius:14px;color:var(--muted)}
+    .tabs{display:flex;gap:6px;padding:10px 10px 0}.tabs button.active{background:#173c2a;border-color:#237e50}.panel{display:none;padding:10px;min-height:0}.panel.active{display:flex;flex:1;flex-direction:column}
+    .messages{flex:1;overflow:auto;display:flex;flex-direction:column;gap:10px;padding-right:4px}.msg{max-width:88%;padding:10px 12px;border-radius:14px;background:#141a22;border:1px solid var(--line);white-space:pre-wrap;line-height:1.42}.msg.user{align-self:flex-end;background:#173c2a}.msg small{display:block;color:var(--muted);margin-top:6px}.sources{font-size:12px;margin-top:8px}.sources a{color:#70b7ff;text-decoration:none;display:block;margin-top:4px}
+    .composer{display:grid;grid-template-columns:1fr auto auto;gap:8px;margin-top:10px}.composer textarea{min-height:62px;resize:vertical}.settings-grid{display:grid;grid-template-columns:170px 1fr;gap:10px;align-items:center}.section{margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}.section h3{margin:0 0 10px}.muted{color:var(--muted);font-size:13px}.sample-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.chip{font-size:12px;padding:5px 8px;border:1px solid var(--line);border-radius:999px}.meter{height:8px;background:#202833;border-radius:99px;overflow:hidden;margin-top:8px}.meter span{display:block;height:100%;width:0;background:var(--accent)}
+  </style>
+</head>
+<body>
+  <div id="avatarView" class="avatar-shell" hidden>
+    <div class="avatar-stage"><div class="avatar-placeholder">🤖</div></div>
+    <div class="avatar-bar no-drag">
+      <button class="icon drag" title="Přesunout">✥</button>
+      <button id="openConsole" class="icon" title="Chat">💬</button>
+      <button id="quickMic" class="icon" title="Voice">🎙</button>
+      <button id="hideAvatar" class="icon" title="Skrýt">×</button>
+    </div>
+  </div>
+
+  <main id="consoleView" class="console" hidden>
+    <header class="titlebar">
+      <div><div class="brand">Sanny Dual Brain</div><div class="statusline"><span id="healthDot" class="dot"></span><span id="healthText">Kontroluju systémy…</span></div></div>
+      <div class="spacer"></div>
+      <button id="moveHandle" class="drag">✥</button><button id="minimize">−</button><button id="close">×</button>
+    </header>
+    <div class="toolbar">
+      <select id="modelMode"><option value="auto">🧠 Auto</option><option value="qwen">Qwen 35B-A3B</option><option value="gpt">GPT-OSS 20B</option></select>
+      <select id="webMode"><option value="auto">🌐 Web auto</option><option value="manual">Web jen na požádání</option><option value="offline">Web offline</option></select>
+      <button id="operatorToggle">Operator OFF</button>
+    </div>
+    <div class="heartbeat-wrap">
+      <video id="heartbeat" class="heartbeat" muted loop playsinline hidden></video>
+      <div id="heartbeatMissing" class="missing">AI_ready.webm / AI_ready.mp4 zatím není v assets/sanny.</div>
+    </div>
+    <div class="tabs"><button data-tab="chat" class="active">Chat</button><button data-tab="voice">Voice Lab</button><button data-tab="settings">Nastavení</button></div>
+
+    <section id="tab-chat" class="panel active">
+      <div id="messages" class="messages"></div>
+      <div class="composer"><textarea id="prompt" placeholder="Napiš nebo nadiktuj příkaz…"></textarea><button id="mic">🎙</button><button id="send" class="primary">Odeslat</button></div>
+    </section>
+
+    <section id="tab-voice" class="panel">
+      <h3>Voice Lab</h3>
+      <p class="muted">Nahraj 5 až 10 čistých vět. Záznamy se ukládají jako mono WAV a XTTS je použije jako referenční profil.</p>
+      <textarea id="voiceSentence">Pavle, našel jsem problém a už vím, jak ho opravit.</textarea>
+      <div><button id="record" class="primary">● Nahrát větu</button> <button id="stopRecord" disabled>■ Zastavit</button></div>
+      <div class="meter"><span id="meterBar"></span></div>
+      <div id="recordStatus" class="muted">Připraveno.</div>
+      <div class="section"><h3>Uložené vzorky</h3><div id="sampleList" class="sample-list"></div></div>
+    </section>
+
+    <section id="tab-settings" class="panel">
+      <div class="settings-grid">
+        <label>Konverzační model</label><input id="chatModel">
+        <label>Pracovní model</label><input id="toolModel">
+        <label>Ollama API key</label><input id="apiKey" type="password">
+        <label>Hlasový engine</label><select id="voiceEngine"><option value="windows">Windows český hlas</option><option value="xtts">XTTS lokální klon</option></select>
+        <label>XTTS profil</label><input id="voiceProfile">
+        <label>Rychlost Windows hlasu</label><input id="voiceRate" type="number" min="-10" max="10">
+      </div>
+      <div class="section"><button id="saveSettings" class="primary">Uložit nastavení</button> <button id="testVoice">Vyzkoušet hlas</button> <button id="openAssets">Otevřít assets/sanny</button></div>
+      <p class="muted">XTTS běží na 127.0.0.1:3211. Když není dostupný, Sanny automaticky použije český Windows hlas.</p>
+    </section>
+  </main>
+<script>
+const mode=new URLSearchParams(location.search).get('mode')||'console';
+const $=s=>document.querySelector(s);let cfg={},recognition=null,recorder=null,audioCtx=null,processor=null,stream=null,chunks=[];
+if(mode==='avatar'){$('#avatarView').hidden=false;$('#openConsole').onclick=()=>window.sanny.openConsole();$('#hideAvatar').onclick=()=>window.close();$('#quickMic').onclick=()=>window.sanny.openConsole();}
+else{initConsole();}
+async function initConsole(){
+  $('#consoleView').hidden=false;cfg=await window.sanny.getConfig();
+  $('#modelMode').value='auto';$('#webMode').value=cfg.webMode;$('#operatorToggle').textContent=cfg.operatorEnabled?'Operator ON':'Operator OFF';
+  $('#chatModel').value=cfg.chatModel;$('#toolModel').value=cfg.toolModel;$('#apiKey').value=cfg.ollamaApiKey||'';$('#voiceEngine').value=cfg.voiceEngine;$('#voiceProfile').value=cfg.voiceProfile;$('#voiceRate').value=cfg.voiceRate||0;
+  const asset=await window.sanny.assetInfo();if(asset.aiReady){const v=$('#heartbeat');v.src=asset.aiReady;v.hidden=false;$('#heartbeatMissing').hidden=true;}
+  bind();await refreshSamples();await refreshHealth();setInterval(refreshHealth,5000);
+}
+function bind(){
+  $('#close').onclick=()=>window.sanny.closeWindow();$('#minimize').onclick=()=>window.sanny.minimizeWindow();
+  document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('active',x===b));document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active',p.id==='tab-'+b.dataset.tab));});
+  $('#webMode').onchange=async()=>{cfg=await window.sanny.setConfig({webMode:$('#webMode').value});refreshHealth();};
+  $('#operatorToggle').onclick=async()=>{cfg=await window.sanny.setConfig({operatorEnabled:!cfg.operatorEnabled});$('#operatorToggle').textContent=cfg.operatorEnabled?'Operator ON':'Operator OFF';};
+  $('#send').onclick=send;$('#prompt').onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}};$('#mic').onclick=startRecognition;
+  $('#saveSettings').onclick=saveSettings;$('#testVoice').onclick=()=>window.sanny.speak('Pavle, hlasový systém je připravený. Teď už zním o něco méně jako bankomat.');$('#openAssets').onclick=()=>window.sanny.openAssets();
+  $('#record').onclick=startRecording;$('#stopRecord').onclick=stopRecording;
+}
+async function refreshHealth(){
+  const h=await window.sanny.health();const ok=h.ready;$('#healthDot').classList.toggle('ok',ok);$('#healthText').textContent=`Qwen ${h.chatModel?'✓':'×'} · GPT ${h.toolModel?'✓':'×'} · web ${h.web?'✓':'×'} · hlas ${h.voice?'✓':'×'}`;
+  const v=$('#heartbeat');if(!v.hidden){v.classList.toggle('offline',!ok);if(ok){v.play().catch(()=>{});}else{v.pause();}}
+}
+function addMessage(text,type,meta,sources=[]){const d=document.createElement('div');d.className='msg '+type;d.textContent=text;if(meta){const s=document.createElement('small');s.textContent=meta;d.appendChild(s);}if(sources.length){const wrap=document.createElement('div');wrap.className='sources';sources.forEach((x,i)=>{const a=document.createElement('a');a.href=x.url;a.textContent=`[${i+1}] ${x.title}`;a.target='_blank';wrap.appendChild(a)});d.appendChild(wrap)}$('#messages').appendChild(d);$('#messages').scrollTop=$('#messages').scrollHeight;}
+async function send(){const text=$('#prompt').value.trim();if(!text)return;$('#prompt').value='';addMessage(text,'user');$('#send').disabled=true;try{const r=await window.sanny.chat({text,modelMode:$('#modelMode').value,webMode:$('#webMode').value});addMessage(r.text,'assistant',r.model,r.sources);window.sanny.speak(r.text);}catch(e){addMessage('Chyba: '+e.message,'assistant');}finally{$('#send').disabled=false;}}
+function startRecognition(){const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){addMessage('Chrome SpeechRecognition není v této Electron verzi dostupný.','assistant');return;}recognition=new SR();recognition.lang='cs-CZ';recognition.interimResults=false;recognition.onresult=e=>{$('#prompt').value=e.results[0][0].transcript;send();};recognition.start();}
+async function saveSettings(){cfg=await window.sanny.setConfig({chatModel:$('#chatModel').value.trim(),toolModel:$('#toolModel').value.trim(),ollamaApiKey:$('#apiKey').value.trim(),voiceEngine:$('#voiceEngine').value,voiceProfile:$('#voiceProfile').value.trim()||'sanny',voiceRate:Number($('#voiceRate').value)||0});$('#webMode').value=cfg.webMode;refreshHealth();}
+async function startRecording(){
+  stream=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true}});audioCtx=new AudioContext({sampleRate:48000});const source=audioCtx.createMediaStreamSource(stream);processor=audioCtx.createScriptProcessor(4096,1,1);chunks=[];processor.onaudioprocess=e=>{const data=new Float32Array(e.inputBuffer.getChannelData(0));chunks.push(data);let peak=0;for(const x of data)peak=Math.max(peak,Math.abs(x));$('#meterBar').style.width=Math.min(100,peak*160)+'%';};source.connect(processor);processor.connect(audioCtx.destination);$('#record').disabled=true;$('#stopRecord').disabled=false;$('#recordStatus').textContent='Nahrávám…';
+}
+async function stopRecording(){
+  if(!audioCtx)return;processor.disconnect();stream.getTracks().forEach(t=>t.stop());const rate=audioCtx.sampleRate;await audioCtx.close();const length=chunks.reduce((n,c)=>n+c.length,0);const pcm=new Float32Array(length);let o=0;for(const c of chunks){pcm.set(c,o);o+=c.length;}const wav=encodeWav(pcm,rate);const base64=arrayBufferToBase64(wav);const p=await window.sanny.saveVoiceSample({name:`sanny_${Date.now()}.wav`,base64});$('#recordStatus').textContent='Uloženo: '+p;$('#record').disabled=false;$('#stopRecord').disabled=true;$('#meterBar').style.width='0';audioCtx=null;refreshSamples();
+}
+function encodeWav(samples,rate){const b=new ArrayBuffer(44+samples.length*2),v=new DataView(b);const w=(o,s)=>[...s].forEach((c,i)=>v.setUint8(o+i,c.charCodeAt(0)));w(0,'RIFF');v.setUint32(4,36+samples.length*2,true);w(8,'WAVE');w(12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);v.setUint32(24,rate,true);v.setUint32(28,rate*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);w(36,'data');v.setUint32(40,samples.length*2,true);let o=44;for(let i=0;i<samples.length;i++,o+=2){const s=Math.max(-1,Math.min(1,samples[i]));v.setInt16(o,s<0?s*32768:s*32767,true);}return b;}
+function arrayBufferToBase64(buffer){let binary='',bytes=new Uint8Array(buffer);for(const b of bytes)binary+=String.fromCharCode(b);return btoa(binary);}
+async function refreshSamples(){const list=await window.sanny.listVoiceSamples();$('#sampleList').innerHTML='';list.forEach(x=>{const s=document.createElement('span');s.className='chip';s.textContent=x;$('#sampleList').appendChild(s)});if(!list.length)$('#sampleList').textContent='Zatím žádné vzorky.';}
+</script>
+</body></html>
