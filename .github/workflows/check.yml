@@ -1,20 +1,44 @@
-name: Check Sanny Desktop
+name: Build Sanny Desktop
 
 on:
   push:
     branches: ["feature/sanny-desktop-0.4", "main"]
   pull_request:
+  workflow_dispatch:
 
 jobs:
-  syntax:
+  build-source:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
-      - run: npm install
-      - run: npm run check
+
+      - name: Install Electron dependencies
+        run: npm install
+
+      - name: Check JavaScript syntax
+        run: npm run check
+
       - name: Check Python syntax
         run: python -m py_compile voice-engine/server.py
+
+      - name: Upload downloadable source ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sanny_Desktop_0_4_Fixed_Source
+          retention-days: 7
+          if-no-files-found: error
+          path: |
+            bootstrap.js
+            main.js
+            preload.js
+            renderer.html
+            package.json
+            README.md
+            INSTALL_AND_RUN.bat
+            scripts/**
+            voice-engine/**
+            assets/**
