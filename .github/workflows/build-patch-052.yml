@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - "patch/0.5.1-to-0.5.2"
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
