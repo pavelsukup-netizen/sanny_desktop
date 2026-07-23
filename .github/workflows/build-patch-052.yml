@@ -1,0 +1,42 @@
+name: Build Sanny Patch 0.5.2
+
+on:
+  push:
+    branches:
+      - "patch/0.5.1-to-0.5.2"
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Check patch JavaScript syntax
+        run: |
+          node --check patch-0.5.2/patch-runtime/apply-patch.js
+          node --check patch-0.5.2/patch-runtime/rollback-patch.js
+          node --check patch-0.5.2/patch-runtime/voice-guard.js
+
+      - name: Validate Personality Core JSON
+        run: node -e "JSON.parse(require('fs').readFileSync('patch-0.5.2/patch-runtime/personality-core.json','utf8')); console.log('JSON OK')"
+
+      - name: Prepare patch artifact
+        run: |
+          mkdir -p dist
+          cp -R patch-0.5.2/. dist/
+
+      - name: Upload downloadable patch ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sanny_Patch_0_5_1_to_0_5_2
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7

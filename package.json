@@ -1,0 +1,14 @@
+{
+  "name": "sanny-desktop",
+  "version": "0.4.1",
+  "description": "Local Windows AI assistant with avatar, dual Ollama models, web search, operator tools and XTTS voice cloning.",
+  "main": "bootstrap.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron .",
+    "check": "node --check bootstrap.js && node --check main.js && node --check preload.js"
+  },
+  "devDependencies": {
+    "electron": "^39.2.7"
+  }
+}
